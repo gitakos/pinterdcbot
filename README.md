@@ -1,0 +1,2 @@
+# pinterdcbot
+Teszt discord bot

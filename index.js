@@ -5,7 +5,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 let eselyFaktor = 10;
-let elozoBuffer = 5;
+//let elozoBuffer = 10;
+let valaszLista = [];
 
 const client = new Client({
     //intents: ezek kb szabályok hogy milyen eventeket érhetsz el
@@ -59,11 +60,12 @@ async function legnagyTagKereses()
 }
 
 let kovetkezoIndex = 0;
+let soronKovetkezo = 0;
 
 async function tablaKiiratas()
 {
     const uzenetek = await Tags.findAll();
-    //console.log("Összes adat:", JSON.stringify(uzenetek, null, 2));
+    console.log("Összes adat:", JSON.stringify(uzenetek, null, 2));
     return uzenetek.length;
 }
 
@@ -71,6 +73,24 @@ async function tablaSync(){
     await Tags.sync();
 }
 let hossz = 0;
+
+function keveres(honnan){
+    if(valaszLista.length!=0)
+    {
+        valaszLista.splice(honnan+1,valaszLista.length-honnan-1);
+    }
+    while(valaszLista.length!=hossz)
+    {
+        let randomSzam = Math.floor(Math.random()*hossz);
+        while(valaszLista.includes(randomSzam))
+        {
+            randomSzam = Math.floor(Math.random()*hossz);
+        }
+        valaszLista.push(randomSzam);
+    }
+    console.log(valaszLista);
+}
+
 client.on('ready',(c) => {
     tablaSync().then(
         function(){
@@ -81,6 +101,7 @@ client.on('ready',(c) => {
                     console.log(hossz);
                     if(hossz>0)
                     {
+                        keveres(0);
                         legnagyTagKereses().then(
                             function(value) {
                                 if(value.szamlalo!==undefined)
@@ -101,11 +122,9 @@ async function randomUzenet(szam){
     let uzenet = await Tags.findOne({
         where: {szamlalo: szam}
     });
-    console.log(uzenet.szamlalo+"!!!!!!!!!!");
+    console.log(uzenet.szamlalo+" az üzenet szamlalo-ja");
     return uzenet;
 }
-
-let elozok = [];
 
 client.on('messageCreate', (msg) =>{
     if(msg.author.bot||hossz===0){
@@ -126,32 +145,25 @@ client.on('messageCreate', (msg) =>{
             esely = 1;//Debug, garantált hogy válaszolni fog
         }
     }
-    console.log(esely);
+    console.log(esely+" dobott ki");
     if(esely<=eselyFaktor)
     {
-        let rnd = Math.floor(Math.random()*hossz);
-        while(elozok.includes(rnd)&&hossz!=1)
-        {
-            rnd = Math.floor(Math.random()*hossz);
-        }
-        if(elozok.length!=elozoBuffer)
-        {
-            elozok.push(rnd);
-        }
-        else
-        {
-            elozok = [];
-            elozok.push(rnd);
-        }
-        randomUzenet(rnd).then(
+        randomUzenet(valaszLista[soronKovetkezo]).then(
             function(value){
                 let uzenet = value.uzenet;
-                console.log(uzenet);
+                console.log(uzenet+"| kiírva!");
                 if(uzenet.includes('|'))
                 {
                     uzenet = uzenet.replace('|',msg.author.username);
                 }
                 msg.reply(uzenet);
+                soronKovetkezo++;
+                if(soronKovetkezo==valaszLista.length)
+                {
+                    keveres(-1);
+                    soronKovetkezo = 0;
+                    console.log("Kifogytak az üzenetek, újra keverés ^^")
+                }
             }
         );
     }
@@ -199,7 +211,9 @@ client.on(Events.InteractionCreate, async interaction => {
             });
             kovetkezoIndex++;
             hossz++;
-            console.log(sugallat);
+            console.log(sugallat + ", Sugallat felvéve!");
+            keveres(soronKovetkezo);
+            console.log("Keverés eredménye ^^")
             return interaction.reply(`Pintér meghallotta a sugallatod.`);}
         catch (error) {
             if (error.name === 'SequelizeUniqueConstraintError') {
